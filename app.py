@@ -32,6 +32,8 @@ start_date = end_date - timedelta(weeks=weeks)
 st.write(f"### 📅 Data Range: {start_date.date()} → {end_date.date()}")
 
 # ---------- FETCH STOCK DATA ----------
+st.write("Columns:", data.columns)
+
 data = yf.download(symbols, start=start_date, end=end_date, group_by='ticker')
 
 # Extract Adj Close prices safely
@@ -64,4 +66,5 @@ ax2.set_ylim(0, 1)
 st.pyplot(fig2)
 
 st.success("✅ Dashboard loaded successfully! Edit and extend with live news data.")
+
 
