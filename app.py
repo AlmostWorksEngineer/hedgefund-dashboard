@@ -30,23 +30,35 @@ try:
     st.subheader("📊 Fetching Stock Data...")
     data_raw = yf.download(symbols, start=start_date, end=end_date, group_by="ticker", progress=False)
 
-    # Handle multiple tickers properly
+    # CASE 1: If only one ticker
     if len(symbols) == 1:
-        data = data_raw["Adj Close"].to_frame(symbols[0])
+        if "Adj Close" in data_raw.columns:
+            data = data_raw["Adj Close"].to_frame(symbols[0])
+        else:
+            data = data_raw["Close"].to_frame(symbols[0])
+
+    # CASE 2: If multiple tickers — MultiIndex columns or flat columns
     else:
-        data = pd.concat(
-            {sym: data_raw[sym]["Adj Close"] for sym in symbols if sym in data_raw.columns or sym in data_raw.keys()},
-            axis=1
-        )
+        if isinstance(data_raw.columns, pd.MultiIndex):
+            # Extract Adj Close if exists, otherwise use Close
+            data = pd.concat(
+                {sym: (data_raw[sym]["Adj Close"] if "Adj Close" in data_raw[sym].columns else data_raw[sym]["Close"])
+                 for sym in symbols if sym in data_raw.columns or sym in data_raw.keys()},
+                axis=1
+            )
+        else:
+            # Flattened columns
+            data = data_raw[[col for col in data_raw.columns if "Close" in col]]
 
     st.success("✅ Data fetched successfully!")
-    st.write("Available Columns:", data.columns.tolist())
+    st.write("Available Columns:", list(data.columns))
 
     # ---------- PLOT STOCK PRICES ----------
     st.subheader("📈 Weekly Stock Prices")
     fig, ax = plt.subplots(figsize=(10, 4))
     data.plot(ax=ax)
     ax.set_title("Stock Prices Over Time")
+    ax.set_ylabel("Price ($)")
     st.pyplot(fig)
 
 except Exception as e:
