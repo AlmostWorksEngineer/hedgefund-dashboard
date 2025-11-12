@@ -1,70 +1,71 @@
 import streamlit as st
-
-st.set_page_config(page_title="Hedge Fund Dashboard", layout="wide")
-
-st.title("📈 Hedge Fund Dashboard")
-st.write("Welcome! If you can read this, the app is working.")
-import streamlit as st
 import pandas as pd
 import yfinance as yf
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
+# ---------- PAGE SETUP ----------
+st.set_page_config(page_title="Hedge Fund Dashboard", layout="wide")
 
-# ---------- PAGE TITLE ----------
-st.set_page_config(page_title="Stock & Sentiment Dashboard", layout="wide")
-st.title("📊 Stock & News Sentiment Tracker")
+st.title("📈 Hedge Fund Dashboard")
+st.write("Welcome! If you can read this, the app is working.")
 
 # ---------- SIDEBAR ----------
 st.sidebar.header("🔍 Select Your Companies")
-symbols = st.sidebar.text_input("Enter 3–5 Stock Symbols (comma separated):", "AAPL,TSLA,GOOGL")
-symbols = [s.strip() for s in symbols.split(",")]
+symbols_input = st.sidebar.text_input("Enter 3–5 Stock Symbols (comma separated):", "AAPL,TSLA,GOOGL")
+symbols = [s.strip().upper() for s in symbols_input.split(",") if s.strip()]
 
 weeks = st.sidebar.slider("Select number of weeks:", 1, 12, 4)
 
 st.sidebar.markdown("---")
 st.sidebar.write("Built by Mridul 🚀")
 
-# ---------- DATA FETCHING ----------
+# ---------- DATE RANGE ----------
 end_date = datetime.now()
 start_date = end_date - timedelta(weeks=weeks)
-
 st.write(f"### 📅 Data Range: {start_date.date()} → {end_date.date()}")
 
 # ---------- FETCH STOCK DATA ----------
-st.write("Columns:", data.columns)
+try:
+    st.subheader("📊 Fetching Stock Data...")
+    data_raw = yf.download(symbols, start=start_date, end=end_date, group_by="ticker", progress=False)
 
-data = yf.download(symbols, start=start_date, end=end_date, group_by='ticker')
+    # Handle multiple tickers properly
+    if len(symbols) == 1:
+        data = data_raw["Adj Close"].to_frame(symbols[0])
+    else:
+        data = pd.concat(
+            {sym: data_raw[sym]["Adj Close"] for sym in symbols if sym in data_raw.columns or sym in data_raw.keys()},
+            axis=1
+        )
 
-# Extract Adj Close prices safely
-if isinstance(symbols, str):
-    data = data["Adj Close"]
-else:
-    # For multiple tickers, make a combined DataFrame
-    data = pd.concat({sym: data[sym]["Adj Close"] for sym in symbols}, axis=1)
+    st.success("✅ Data fetched successfully!")
+    st.write("Available Columns:", data.columns.tolist())
 
-if isinstance(data, pd.Series):
-    data = data.to_frame()
+    # ---------- PLOT STOCK PRICES ----------
+    st.subheader("📈 Weekly Stock Prices")
+    fig, ax = plt.subplots(figsize=(10, 4))
+    data.plot(ax=ax)
+    ax.set_title("Stock Prices Over Time")
+    st.pyplot(fig)
 
-# ---------- PLOT STOCK PRICES ----------
-st.subheader("📈 Weekly Stock Prices")
-fig, ax = plt.subplots(figsize=(10, 4))
-data.plot(ax=ax)
-st.pyplot(fig)
+except Exception as e:
+    st.error(f"⚠️ Could not fetch stock data: {e}")
+    st.stop()
 
 # ---------- SIMULATED SENTIMENT DATA ----------
 st.subheader("💬 Weekly Sentiment Summary")
 
+weeks_range = pd.date_range(start=start_date, end=end_date, freq="W")
 sentiment_data = pd.DataFrame({
-    "Week End": pd.date_range(start=start_date, end=end_date, freq="W"),
-    "Mean Sentiment (0=Neg,1=Pos)": [0.2, 0.5, 0.8, 0.6][:len(pd.date_range(start=start_date, end=end_date, freq='W'))]
+    "Week End": weeks_range,
+    "Mean Sentiment (0=Neg,1=Pos)": [0.2, 0.5, 0.8, 0.6][:len(weeks_range)]
 })
 
 fig2, ax2 = plt.subplots(figsize=(8, 3))
 ax2.bar(sentiment_data["Week End"], sentiment_data["Mean Sentiment (0=Neg,1=Pos)"])
 ax2.set_ylim(0, 1)
+ax2.set_title("Simulated Weekly News Sentiment")
 st.pyplot(fig2)
 
-st.success("✅ Dashboard loaded successfully! Edit and extend with live news data.")
-
-
+st.success("🎉 Dashboard loaded successfully! Extend this with live news sentiment later.")
